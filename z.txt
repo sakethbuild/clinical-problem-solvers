@@ -1,0 +1,8 @@
+- smaller chunks are bad in our use case, cause they dont preserve much context
+- ive choosen 200 words per chunk for our use case which seems to be ideal
+- for each chunk we will first extract entities using NER(names entity recognition)
+- tag each of these entities to their types using UMLS(Unified Medical Language System)
+- each chunk has the following data: 
+    - text, start time, end time, word count,video_id, chunk index, metadata of the video and medical entities
+    - and each given entity has text, cui id and type
+    - example of how each chunk will look like 
