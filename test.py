@@ -1,20 +1,43 @@
-import spacy
-import scispacy
-from scispacy.linking import EntityLinker
- 
-nlp = spacy.load("en_core_sci_md")
-nlp.add_pipe("scispacy_linker", config={"resolve_abbreviations": True, "linker_name": "umls"})
-def extract_tagged_entities(text):
-    doc = nlp(text)
-    results = []
-    for ent in doc.ents:
-        for umls_ent in ent._.kb_ents[:1]:  # Top UMLS match
-            concept = nlp.get_pipe("scispacy_linker").kb.cui_to_entity[umls_ent[0]]
-            results.append({
-                "text": ent.text,
-                "umls_cui": umls_ent[0],
-                "semantic_type": concept.types[0]  # Example: ['T184']
-            })
-    return results
+import os
+import json
+from pymongo import MongoClient
 
-print(extract_tagged_entities('he patient has shortness of breath and chest pain.'))
+client=MongoClient('mongodb+srv://sakethbuild:eBt0xzwJSnk8djGX@cluster0.8rgvta7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
+db = client["youtube"]
+collection = db["chunks"]
+
+files = os.listdir('data')
+for file in files:
+    with open(f'data/{file}') as f:
+        data = json.load(f)
+        chunks = []
+        count = 0
+
+        while count < len(data['transcript_data']):
+            obj = {
+                "text": '',
+                "start_time": data["transcript_data"][count]['start'],
+                "duration": 0,
+                "word_count": 0,
+                "chunk_index": len(chunks),
+                "metadata": data['metadata']
+            }
+
+            curr_words = 0 
+
+            while curr_words < 200 and count < len(data['transcript_data']):
+                segment = data['transcript_data'][count]
+                text = segment['text'].strip()
+                words = len(text.split())
+
+                if text:
+                    obj['text'] += ' ' + text
+                    obj['duration'] += segment['duration']
+                    curr_words += words
+
+                count += 1 
+
+            obj['word_count'] = len(obj['text'].split())
+            chunks.append(obj)
+            collection.insert_one(obj)
+            print(f'added chunk : {obj['chunk_index']}')
