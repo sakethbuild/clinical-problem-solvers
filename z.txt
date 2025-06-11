@@ -6,3 +6,8 @@
     - text, start time, end time, word count,video_id, chunk index, metadata of the video and medical entities
     - and each given entity has text, cui id and type
     - example of how each chunk will look like 
+- now we have around 40k chunks we will generate embeddings for each chunk
+- we will generate embeddings using the biobert embeddings model dur to the following reasons
+    - it understands medical terms better 
+    - it has already been pre trained on a vocabulary of words
+    - hence understands clinical context better than anyother given model
