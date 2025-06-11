@@ -4,10 +4,11 @@ from pymongo import MongoClient
 
 client=MongoClient('mongodb+srv://sakethbuild:eBt0xzwJSnk8djGX@cluster0.8rgvta7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
 db = client["youtube"]
-collection = db["chunks"]
+collection = db["chunk-data"]
 
 files = os.listdir('data')
-for file in files:
+for file in files[::-1]:
+    print(f'Processing file: {file}')  # Show which JSON file is being processed
     with open(f'data/{file}') as f:
         data = json.load(f)
         chunks = []
@@ -39,5 +40,9 @@ for file in files:
 
             obj['word_count'] = len(obj['text'].split())
             chunks.append(obj)
+            # Search for existing document with the same text before inserting
+            if collection.find_one({"text": obj['text']}):
+                print(f"Skipped duplicate chunk: {obj['chunk_index']} | {file}")
+                continue
             collection.insert_one(obj)
-            print(f'added chunk : {obj['chunk_index']}')
+            print(f'added chunk : {obj["chunk_index"]} | {file}')
