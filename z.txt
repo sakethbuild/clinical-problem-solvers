@@ -11,3 +11,5 @@
     - it understands medical terms better 
     - it has already been pre trained on a vocabulary of words
     - hence understands clinical context better than anyother given model
+- everything is working well ut mongo db limit seems to be crossed all the time\
+- hence cutting and making the data shorter

@@ -1,22 +1,25 @@
-from pymongo import MongoClient
+import json
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
-client=MongoClient('mongodb+srv://sakethbuild:eBt0xzwJSnk8djGX@cluster0.8rgvta7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
-db = client["youtube"]
-collection = db["chunk-data"]
+# Load data from backup.json
+with open('backup.json', 'r') as file:
+    data = json.load(file)
 
-chunks = list(collection.find())
-text_data = [x['text'] for x in chunks]
-print(f'reterived {len(text_data)} from mongodb, now generating embeddings')
+# Extract text data
+text_data = [item['text'] for item in data]
+print(f'Retrieved {len(text_data)} items from backup.json, now generating embeddings')
 
+# Generate embeddings
 model = SentenceTransformer("pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb")
 embeddings = model.encode(text_data, batch_size=32, show_progress_bar=True)
 
-for index, embedding in enumerate(embeddings):
-    chunk_id = chunks[index]['_id']
-    collection.update_one(
-        {'_id': chunk_id},
-        {'$set': {'embedding': embedding.tolist()}}
-    )
-    print(f'Updated embedding for chunk {index + 1}/{len(embeddings)}')
+# Add embeddings to the data
+for index, embedding in enumerate(tqdm(embeddings)):
+    data[index]['embedding'] = embedding.tolist()
+
+# Save the updated data back to backup.json
+with open('backup2.json', 'w') as file:
+    json.dump(data, file)
+
+print(f'Saved updated data with embeddings to backup.json')
