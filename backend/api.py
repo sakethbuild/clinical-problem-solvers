@@ -1,9 +1,51 @@
-from flask import Flask
+from flask import Flask, request, jsonify
 import json
-app=Flask(__name__)
+import os
+from pinecone import Pinecone
+from sentence_transformers import SentenceTransformer
+
+app = Flask(__name__)
+
+# Initialize Pinecone and SentenceTransformer once
+pc = Pinecone(api_key=os.getenv('PINECONE_API_KEY'))
+index = pc.Index('medrag')
+model = SentenceTransformer("pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb")
+
+with open('chunk-details.json','r') as file:
+    chunk_data=json.load(file)
+
+with open('video-data.json','r') as f:
+    video_data=json.load(f)
 
 @app.route('/')
 def home():
     return {"message":"server is alive"}
+
+@app.route('/search', methods=['GET'])
+def search():
+    query = request.args.get('query')
+    if not query:
+        return jsonify({"error": "Missing 'query' parameter"}), 400
+        
+    embeddings = model.encode([query], batch_size=32, show_progress_bar=False)
+    result = index.query(
+        vector=embeddings[0].tolist(),
+        top_k=5,
+        include_metadata=True
+    )
+    
+    # Format the response to include only relevant data    
+    formatted_results = [{
+        'id': match['id'],
+        'text': match['metadata']['text'],
+        'url': match['metadata']['url'],
+        'score': match['score'],
+        'transcript_info':chunk_data[match['id'][6:]],
+        'metadata':video_data[match['metadata']['url']]
+    } for match in result['matches']]
+    
+    return jsonify({
+        'matches': formatted_results
+    })
 
 app.run(debug=True)
