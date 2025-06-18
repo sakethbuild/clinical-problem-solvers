@@ -3,8 +3,13 @@ import json
 import os
 from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
+from flask_cors import CORS
+
+load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 
 # Initialize Pinecone and SentenceTransformer once
 pc = Pinecone(api_key=os.getenv('PINECONE_API_KEY'))
@@ -33,14 +38,14 @@ def search():
         top_k=5,
         include_metadata=True
     )
-    
-    # Format the response to include only relevant data    
+    print(result)
     formatted_results = [{
         'id': match['id'],
         'text': match['metadata']['text'],
         'url': match['metadata']['url'],
         'score': match['score'],
-        'transcript_info':chunk_data[match['id'][6:]],
+        #'transcript_info':chunk_data[match['id'][6:]],
+        'start_time': match['metadata']['start_time'],
         'metadata':video_data[match['metadata']['url']]
     } for match in result['matches']]
     
