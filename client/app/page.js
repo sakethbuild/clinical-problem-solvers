@@ -1,8 +1,9 @@
 "use client"
 import { Search, Send, Loader2, YoutubeIcon, Tag, Clock, Filter, X, FileText } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { diagnosisList } from "./diagnosisList"
+import dxDataRaw from "../public/dx.json" assert { type: "json" };
 
 const processVideoUrl = (url, startTime) => {
   if (!url) return "#"
@@ -26,6 +27,7 @@ export default function Home() {
   const [inputValue, SetInputValue] = useState("")
   const [displayText, SetDisplayText] = useState("Clinical Problem Solvers")
   const [results, SetResults] = useState([])
+  const [allResults, setAllResults] = useState([]) // Store all videos
   const [loading, setLoading] = useState(false)
   const [showTranscript, setShowTranscript] = useState(false)
   const [selectedTranscript, setSelectedTranscript] = useState(null)
@@ -33,10 +35,11 @@ export default function Home() {
   const [showFilter, setShowFilter] = useState(false)
   const [selectedDiagnoses, setSelectedDiagnoses] = useState([])
   const [diagnosisInput, setDiagnosisInput] = useState("")
+  const [dxResults, setDxResults] = useState([])
 
   // Filter results by selected diagnoses if set
   const filteredResults = selectedDiagnoses.length > 0
-    ? results.filter(item => selectedDiagnoses.some(dx => (item.final_dx || "").toLowerCase().includes(dx.toLowerCase())))
+    ? allResults.filter(item => selectedDiagnoses.some((dx) => (item.final_dx || "").toLowerCase().includes(dx.toLowerCase())))
     : results
 
   const handleSend = async () => {
@@ -53,8 +56,10 @@ export default function Home() {
       const data = await res.json()
       setLoadingProgress(100)
       SetResults(data.matches || [])
+      setAllResults(data.all_videos || data.matches || []) // Use all_videos if available, fallback to matches
     } catch (e) {
       SetResults([])
+      setAllResults([])
     } finally {
       clearInterval(progressInterval)
       setTimeout(() => {
@@ -68,6 +73,32 @@ export default function Home() {
     setSelectedTranscript(item)
     setShowTranscript(true)
   }
+
+  // On initial load, fetch all videos for diagnosis filtering
+  useEffect(() => {
+    async function fetchAllVideos() {
+      try {
+        const res = await fetch("http://localhost:5000/all_videos")
+        const data = await res.json()
+        setAllResults(data || [])
+      } catch {}
+    }
+    fetchAllVideos()
+  }, [])
+
+  // Fetch dx.json and filter by Final Dx
+  useEffect(() => {
+    if (selectedDiagnoses.length > 0) {
+      // If dx.json is not loaded, load and filter
+      const dxData = dxDataRaw || {};
+      const filtered = Object.entries(dxData).filter(([url, meta]) =>
+        selectedDiagnoses.some(dx => (meta["Final Dx"] || "").toLowerCase().includes(dx.toLowerCase()))
+      ).map(([url, meta]) => ({ url: url.trim(), ...meta }))
+      setDxResults(filtered)
+    } else {
+      setDxResults([])
+    }
+  }, [selectedDiagnoses])
 
   return (
     <motion.div
@@ -214,6 +245,98 @@ export default function Home() {
                   </motion.div>
                 ))}
               </>
+            ) : selectedDiagnoses.length > 0 && dxResults.length > 0 ? (
+              dxResults.map((item, index) => (
+                <motion.a
+                  key={item.url}
+                  initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{
+                    duration: 0.5,
+                    delay: index * 0.1,
+                    type: "spring",
+                    stiffness: 100,
+                  }}
+                  whileHover={{
+                    scale: 1.02,
+                    y: -5,
+                    transition: { duration: 0.2 },
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex flex-col bg-zinc-800/30 rounded-xl border border-zinc-700/50 overflow-hidden hover:border-zinc-600 transition-all duration-300 relative backdrop-blur"
+                >
+                  <div className="relative overflow-hidden">
+                    <motion.img
+                      whileHover={{ scale: 1.05 }}
+                      transition={{ duration: 0.3 }}
+                      src={item.thumbnail}
+                      alt={item.title}
+                      className="w-full h-48 object-cover"
+                    />
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      whileHover={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                      className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"
+                    />
+                    {index < 3 && (
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.5 + index * 0.1 }}
+                        className="absolute top-3 left-3 flex items-center gap-2"
+                      >
+                        <motion.div
+                          animate={{ scale: [1, 1.2, 1] }}
+                          transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
+                          className="w-2 h-2 rounded-full bg-white"
+                        />
+                        <span className="text-xs font-medium bg-white/20 border border-white/30 text-white px-2 py-1 rounded-full backdrop-blur-sm">
+                          Top Match
+                        </span>
+                      </motion.div>
+                    )}
+                  </div>
+                  <div className="p-5 flex-1 flex flex-col">
+                    <h3 className="font-medium text-lg mb-2 line-clamp-1">{item.title}</h3>
+                    <p className="text-zinc-400 text-sm line-clamp-2 mb-4">{item.description}</p>
+                    <div className="mb-2 text-xs text-blue-400 font-semibold">
+                      {item["Final Dx"] && (
+                        <span>Final Dx: {item["Final Dx"]}</span>
+                      )}
+                    </div>
+                    <div className="mt-auto">
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {(item.title_extracted_entities || []).filter(e => ["T184", "T047"].includes(e.semantic_type)).map((tag, tagIndex) => (
+                          <span
+                            key={tagIndex}
+                            className="px-2 py-1 bg-white/10 text-xs text-white rounded-full border border-white/20"
+                          >
+                            {tag.text}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between pt-4 border-t border-zinc-700/50">
+                        <div className="text-xs text-zinc-500">{item.upload_date}</div>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-white hover:bg-zinc-200 text-black rounded-full text-xs flex items-center gap-1 transition-colors"
+                          >
+                            <Send className="w-3 h-3" />
+                            Watch
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.a>
+              ))
             ) : filteredResults.length > 0 ? (
               filteredResults.map((item, index) => (
                 <motion.a
@@ -453,10 +576,15 @@ export default function Home() {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => setShowFilter(true)}
-            className="ml-2 p-2.5 rounded-full bg-zinc-700 hover:bg-zinc-600 text-white transition-colors"
+            className="ml-2 p-2.5 rounded-full bg-zinc-700 hover:bg-zinc-600 text-white transition-colors relative"
             aria-label="Filter"
           >
             <Filter className="w-5 h-5" />
+            {selectedDiagnoses.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs font-bold rounded-full px-1.5 py-0.5 border-2 border-zinc-800 shadow">
+                {selectedDiagnoses.length}
+              </span>
+            )}
           </motion.button>
         </motion.div>
       </motion.div>
@@ -469,60 +597,64 @@ export default function Home() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="fixed inset-0 bg-black z-40"
-              onClick={() => setShowFilter(false)}
             />
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 40 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 40 }}
               transition={{ duration: 0.25 }}
-              className="fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 bg-zinc-900 border border-zinc-700/50 rounded-2xl p-4 w-full max-w-md shadow-2xl flex flex-col gap-3"
+              className="fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 bg-zinc-900 border border-zinc-700/50 rounded-2xl p-5 w-full max-w-md shadow-2xl flex flex-col gap-3"
             >
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-2">
                 <span className="font-semibold text-white text-base">Diagnosis Filter</span>
                 <button
                   className="p-1 rounded-full hover:bg-zinc-800 text-zinc-400"
                   onClick={() => setShowFilter(false)}
+                  aria-label="Close filter"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="flex flex-wrap gap-1 mb-1">
+              <div className="flex flex-wrap gap-1 mb-2 min-h-[28px]">
+                {selectedDiagnoses.length === 0 && <span className="text-xs text-zinc-500">No diagnoses selected</span>}
                 {selectedDiagnoses.map(dx => (
                   <span key={dx} className="flex items-center bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs">
                     {dx}
                     <button
                       className="ml-1 text-white/80 hover:text-white"
                       onClick={() => setSelectedDiagnoses(selectedDiagnoses.filter(d => d !== dx))}
+                      aria-label={`Remove ${dx}`}
                     >
                       <X className="w-3 h-3" />
                     </button>
                   </span>
                 ))}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2 mb-1">
                 <input
                   type="text"
                   value={diagnosisInput}
                   onChange={e => setDiagnosisInput(e.target.value)}
                   placeholder="Type to filter..."
-                  className="bg-zinc-800 text-white px-2 py-0.5 rounded-full outline-none text-xs w-36"
+                  className="bg-zinc-800 text-white px-2 py-1 rounded-full outline-none text-xs w-40 border border-zinc-700 focus:border-blue-500 transition"
                   autoFocus
                 />
                 <button
-                  className="px-2 py-0.5 rounded-full bg-zinc-700 text-white text-xs hover:bg-zinc-600"
+                  className="px-2 py-1 rounded-full bg-zinc-700 text-white text-xs hover:bg-zinc-600 border border-zinc-600"
                   onClick={() => {
                     setSelectedDiagnoses([])
                     setDiagnosisInput("")
                   }}
                 >Clear</button>
               </div>
-              <div className="flex flex-col gap-1 overflow-y-auto max-h-32 mt-1 pb-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900"
+              <div className="flex flex-col gap-1 overflow-y-auto max-h-40 mt-1 pb-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900 bg-zinc-800 rounded-lg p-2 border border-zinc-700"
                 style={{ WebkitOverflowScrolling: 'touch' }}>
-                {diagnosisList.filter(dx => dx.toLowerCase().includes(diagnosisInput.toLowerCase()) && !selectedDiagnoses.includes(dx)).map(dx => (
+                {diagnosisList.filter(dx => dx.toLowerCase().includes(diagnosisInput.toLowerCase()) && !selectedDiagnoses.includes(dx)).length === 0 ? (
+                  <span className="text-xs text-zinc-500">No matches</span>
+                ) : diagnosisList.filter(dx => dx.toLowerCase().includes(diagnosisInput.toLowerCase()) && !selectedDiagnoses.includes(dx)).map(dx => (
                   <button
                     key={dx}
-                    className="px-2 py-0.5 rounded-full border text-xs whitespace-nowrap bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-blue-600 hover:text-white text-left"
+                    className="px-2 py-1 rounded-full border text-xs whitespace-nowrap bg-zinc-900 border-zinc-700 text-zinc-200 hover:bg-blue-600 hover:text-white text-left transition"
                     onClick={() => setSelectedDiagnoses([...selectedDiagnoses, dx])}
                   >
                     {dx}
@@ -530,7 +662,7 @@ export default function Home() {
                 ))}
               </div>
               <button
-                className="mt-2 px-4 py-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold self-end"
+                className="mt-3 px-4 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold self-end shadow"
                 onClick={() => setShowFilter(false)}
               >
                 Filter by Dx
