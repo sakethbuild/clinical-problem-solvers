@@ -22,6 +22,9 @@ with open('chunk-details.json','r') as file:
 with open('video-data.json','r') as f:
     video_data=json.load(f)
 
+with open('dx.json','r') as f:
+    dx_data=json.load(f)
+
 @app.route('/')
 def home():
     return {"message":"server is alive"}
@@ -46,7 +49,8 @@ def search():
         'score': match['score'],
         #'transcript_info':chunk_data[match['id'][6:]],
         'start_time': match['metadata']['start_time'],
-        'metadata':video_data[match['metadata']['url']]
+        'metadata':video_data[match['metadata']['url']],
+        'final_dx': dx_data.get(match['metadata']['url'], {}).get('Final Dx')
     } for match in result['matches']]
     
     return jsonify({

@@ -2,6 +2,7 @@
 import { Search, Send, Loader2, YoutubeIcon, Tag, Clock, Filter, X, FileText } from "lucide-react"
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { diagnosisList } from "./diagnosisList"
 
 const processVideoUrl = (url, startTime) => {
   if (!url) return "#"
@@ -23,12 +24,20 @@ const filterMedicalTags = (entities) => {
 
 export default function Home() {
   const [inputValue, SetInputValue] = useState("")
-  const [displayText, SetDisplayText] = useState("Clinical Solvers")
+  const [displayText, SetDisplayText] = useState("Clinical Problem Solvers")
   const [results, SetResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [showTranscript, setShowTranscript] = useState(false)
   const [selectedTranscript, setSelectedTranscript] = useState(null)
   const [loadingProgress, setLoadingProgress] = useState(0)
+  const [showFilter, setShowFilter] = useState(false)
+  const [selectedDiagnoses, setSelectedDiagnoses] = useState([])
+  const [diagnosisInput, setDiagnosisInput] = useState("")
+
+  // Filter results by selected diagnoses if set
+  const filteredResults = selectedDiagnoses.length > 0
+    ? results.filter(item => selectedDiagnoses.some(dx => (item.final_dx || "").toLowerCase().includes(dx.toLowerCase())))
+    : results
 
   const handleSend = async () => {
     setLoading(true)
@@ -90,25 +99,14 @@ export default function Home() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.3 }}
               className="mb-8"
-            >
-              <p className="text-zinc-400 text-sm">
-                made by{" "}
-                <a
-                  href="https://twitter.com/saketh_vinj"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-white hover:text-zinc-300 transition-colors underline"
-                >
-                  @saketh_vinj
-                </a>
-              </p>
+            >              
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.4 }}
-              className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8 mt-12"
+              className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 mt-10"
             >
               {[
                 { icon: YoutubeIcon, text: "1000+ Videos", desc: "Curated medical content", color: "text-red-500" },
@@ -118,20 +116,16 @@ export default function Home() {
               ].map((feature, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 30 }}
+                  initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.6 + i * 0.1 }}
-                  whileHover={{
-                    scale: 1.05,
-                    y: -5,
-                    transition: { duration: 0.2 },
-                  }}
-                  className="p-4 rounded-xl bg-zinc-800/50 backdrop-blur border border-zinc-700/50 hover:border-zinc-600 transition-all duration-300 cursor-pointer"
+                  transition={{ duration: 0.4, delay: 0.5 + i * 0.08 }}
+                  whileHover={{ scale: 1.04, y: -3, transition: { duration: 0.15 } }}
+                  className="p-2 rounded-xl bg-zinc-800/50 backdrop-blur border border-zinc-700/50 hover:border-zinc-600 transition-all duration-200 cursor-pointer"
                 >
-                  <div className="mb-3 flex justify-center">
-                    <feature.icon className={`w-8 h-8 ${feature.color}`} />
+                  <div className="mb-2 flex justify-center">
+                    <feature.icon className={`w-6 h-6 ${feature.color}`} />
                   </div>
-                  <p className="font-medium mb-1 text-white">{feature.text}</p>
+                  <p className="font-medium mb-0.5 text-sm text-white">{feature.text}</p>
                   <p className="text-xs text-zinc-400">{feature.desc}</p>
                 </motion.div>
               ))}
@@ -220,8 +214,8 @@ export default function Home() {
                   </motion.div>
                 ))}
               </>
-            ) : results.length > 0 ? (
-              results.map((item, index) => (
+            ) : filteredResults.length > 0 ? (
+              filteredResults.map((item, index) => (
                 <motion.a
                   key={item.id}
                   initial={{ opacity: 0, y: 50, scale: 0.9 }}
@@ -287,6 +281,12 @@ export default function Home() {
                   <div className="p-5 flex-1 flex flex-col">
                     <h3 className="font-medium text-lg mb-2 line-clamp-1">{item.metadata?.title}</h3>
                     <p className="text-zinc-400 text-sm line-clamp-2 mb-4">{item.metadata?.description}</p>
+
+                    <div className="mb-2 text-xs text-blue-400 font-semibold">
+                      {item.final_dx && (
+                        <span>Final Dx: {item.final_dx}</span>
+                      )}
+                    </div>
 
                     <div className="mt-auto">
                       <motion.div
@@ -449,8 +449,96 @@ export default function Home() {
               {loading ? <Loader2 className="w-5 h-5" /> : <Send className="w-5 h-5" />}
             </motion.div>
           </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowFilter(true)}
+            className="ml-2 p-2.5 rounded-full bg-zinc-700 hover:bg-zinc-600 text-white transition-colors"
+            aria-label="Filter"
+          >
+            <Filter className="w-5 h-5" />
+          </motion.button>
         </motion.div>
       </motion.div>
+      <AnimatePresence>
+        {showFilter && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.6 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black z-40"
+              onClick={() => setShowFilter(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 40 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 40 }}
+              transition={{ duration: 0.25 }}
+              className="fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 bg-zinc-900 border border-zinc-700/50 rounded-2xl p-4 w-full max-w-md shadow-2xl flex flex-col gap-3"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-white text-base">Diagnosis Filter</span>
+                <button
+                  className="p-1 rounded-full hover:bg-zinc-800 text-zinc-400"
+                  onClick={() => setShowFilter(false)}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1 mb-1">
+                {selectedDiagnoses.map(dx => (
+                  <span key={dx} className="flex items-center bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs">
+                    {dx}
+                    <button
+                      className="ml-1 text-white/80 hover:text-white"
+                      onClick={() => setSelectedDiagnoses(selectedDiagnoses.filter(d => d !== dx))}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={diagnosisInput}
+                  onChange={e => setDiagnosisInput(e.target.value)}
+                  placeholder="Type to filter..."
+                  className="bg-zinc-800 text-white px-2 py-0.5 rounded-full outline-none text-xs w-36"
+                  autoFocus
+                />
+                <button
+                  className="px-2 py-0.5 rounded-full bg-zinc-700 text-white text-xs hover:bg-zinc-600"
+                  onClick={() => {
+                    setSelectedDiagnoses([])
+                    setDiagnosisInput("")
+                  }}
+                >Clear</button>
+              </div>
+              <div className="flex flex-col gap-1 overflow-y-auto max-h-32 mt-1 pb-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900"
+                style={{ WebkitOverflowScrolling: 'touch' }}>
+                {diagnosisList.filter(dx => dx.toLowerCase().includes(diagnosisInput.toLowerCase()) && !selectedDiagnoses.includes(dx)).map(dx => (
+                  <button
+                    key={dx}
+                    className="px-2 py-0.5 rounded-full border text-xs whitespace-nowrap bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-blue-600 hover:text-white text-left"
+                    onClick={() => setSelectedDiagnoses([...selectedDiagnoses, dx])}
+                  >
+                    {dx}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="mt-2 px-4 py-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold self-end"
+                onClick={() => setShowFilter(false)}
+              >
+                Filter by Dx
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
