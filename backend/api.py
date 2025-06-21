@@ -57,4 +57,7 @@ def search():
         'matches': formatted_results
     })
 
-app.run()
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))  # fallback for local testing
+    app.run(host="0.0.0.0", port=port)
