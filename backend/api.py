@@ -57,4 +57,4 @@ def search():
         'matches': formatted_results
     })
 
-app.run(debug=True)
+app.run()
