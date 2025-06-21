@@ -38,7 +38,7 @@ def search():
     embeddings = model.encode([query], batch_size=32, show_progress_bar=False)
     result = index.query(
         vector=embeddings[0].tolist(),
-        top_k=5,
+        top_k=10,
         include_metadata=True
     )
     print(result)
