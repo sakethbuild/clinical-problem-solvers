@@ -52,7 +52,7 @@ export default function Home() {
     }, 300)
 
     try {
-      const res = await fetch(`http://localhost:5000/search?query=${inputValue}`)
+      const res = await fetch(`http://127.0.0.1:5000/search?query=${inputValue}`)
       const data = await res.json()
       setLoadingProgress(100)
       SetResults(data.matches || [])
