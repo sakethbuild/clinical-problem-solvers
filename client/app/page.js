@@ -52,19 +52,11 @@ export default function Home() {
     }, 300)
 
     try {
-      // Updated to use the render.com deployment instead of vercel
-      const res = await fetch(`https://clinical-problem-solvers.onrender.com/search?query=${inputValue}`)
-      
-      // Check if the response is valid JSON
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("API did not return JSON data");
-      }
-      
-      const data = await res.json();
-      setLoadingProgress(100);
-      SetResults(data.matches || []);
-      setAllResults(data.all_videos || data.matches || []); // Use all_videos if available, fallback to matches
+      const res = await fetch(`http://127.0.0.1:5000/search?query=${inputValue}`)
+      const data = await res.json()
+      setLoadingProgress(100)
+      SetResults(data.matches || [])
+      setAllResults(data.all_videos || data.matches || []) // Use all_videos if available, fallback to matches
     } catch (e) {
       console.error("Search error:", e);
       
