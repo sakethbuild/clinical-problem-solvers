@@ -84,9 +84,12 @@ export default function Home() {
 
   // Filter results by selected criteria
   const filteredResults = () => {
-    let filtered = allResults
+    // If we have search results, return them
+    if (results.length > 0) {
+      return results
+    }
 
-    // Apply dx.json filtering if any filters are selected
+    // Only apply dx.json filtering if any filters are selected
     if (selectedDiagnoses.length > 0 || selectedComplaints.length > 0 || selectedTopics.length > 0) {
       const dxFiltered = Object.entries(dxDataRaw || {}).filter(([url, meta]) => {
         const matchesDx = selectedDiagnoses.length === 0 || 
@@ -107,7 +110,8 @@ export default function Home() {
       return dxFiltered
     }
 
-    return results
+    // Return empty array if no search results and no filters
+    return []
   }
 
   const handleSend = async () => {
@@ -120,7 +124,7 @@ export default function Home() {
     }, 300)
 
     try {
-      // Updated to use the render.com deployment instead of vercel
+      // Using the correct endpoint for search
       const res = await fetch(`https://clinical-problem-solvers.onrender.com/search?query=${inputValue}`)
       
       // Check if the response is valid JSON
@@ -130,9 +134,35 @@ export default function Home() {
       }
       
       const data = await res.json();
+      console.log("API Response:", data); // Debug log
       setLoadingProgress(100);
-      SetResults(data.matches || []);
-      setAllResults(data.all_videos || data.matches || []); // Use all_videos if available, fallback to matches
+      
+      // Handle the search results properly - prioritize matches key
+      if (data.matches && Array.isArray(data.matches)) {
+        // Primary case: results are nested under 'matches' key (as shown in your example)
+        console.log("Found matches:", data.matches.length);
+        SetResults(data.matches);
+        setAllResults(data.matches);
+      } else if (data && Array.isArray(data)) {
+        // If data is directly an array of results
+        SetResults(data);
+        setAllResults(data);
+      } else if (data.results && Array.isArray(data.results)) {
+        // If results are nested under 'results' key
+        SetResults(data.results);
+        setAllResults(data.results);
+      } else {
+        // Fallback: try to extract any array from the response
+        const possibleArrays = Object.values(data).filter(Array.isArray);
+        if (possibleArrays.length > 0) {
+          SetResults(possibleArrays[0]);
+          setAllResults(possibleArrays[0]);
+        } else {
+          console.log("No valid results found in response");
+          SetResults([]);
+          setAllResults([]);
+        }
+      }
     } catch (e) {
       console.error("Search error:", e);
       
@@ -213,21 +243,6 @@ export default function Home() {
     setSelectedTranscript(item)
     setShowTranscript(true)
   }
-
-  // On initial load, fetch all videos for diagnosis filtering
-  useEffect(() => {
-    async function fetchAllVideos() {
-      try {
-        // Updated to use the render.com deployment instead of vercel
-        const res = await fetch("https://clinical-problem-solvers.onrender.com/all_videos")
-        const data = await res.json()
-        setAllResults(data || [])
-      } catch (error) {
-        console.error("Failed to fetch all videos:", error)
-      }
-    }
-    fetchAllVideos()
-  }, [])
 
   // Fetch dx.json and filter by selected criteria
   useEffect(() => {
@@ -468,6 +483,13 @@ export default function Home() {
               setAllResults([]);
               SetInputValue("");
               setDxResults([]);
+              // Reset all filters
+              setSelectedDiagnoses([]);
+              setSelectedComplaints([]);
+              setSelectedTopics([]);
+              setDiagnosisInput("");
+              setComplaintInput("");
+              setTopicInput("");
             }}
             className="flex items-center gap-2 px-4 py-2 bg-zinc-800/60 hover:bg-zinc-700/60 rounded-full text-sm text-zinc-200 border border-zinc-700/60 transition-all"
           >
@@ -480,7 +502,7 @@ export default function Home() {
             animate={{ opacity: 1 }}
             className="text-zinc-400 text-sm md:text-base font-medium text-center sm:text-right"
           >
-            Showing top {Math.min(dxResults.length || filteredResults.length, 10)} results for "{inputValue}"
+            Showing top {Math.min(dxResults.length || results.length || filteredResults().length, 10)} results for "{inputValue}"
           </motion.div>
         </motion.div>
       )}
@@ -618,8 +640,133 @@ export default function Home() {
                 </div>
               </motion.a>
             ))
-          ) : filteredResults.length > 0 ? (
-            filteredResults.map((item, index) => (
+          ) : filteredResults().length > 0 ? (
+            filteredResults().map((item, index) => (
+              <motion.a
+                key={item.id || index}
+                initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{
+                  duration: 0.5,
+                  delay: index * 0.1,
+                  type: "spring",
+                  stiffness: 100,
+                }}
+                whileHover={{
+                  scale: 1.02,
+                  y: -5,
+                  transition: { duration: 0.2 },
+                }}
+                whileTap={{ scale: 0.98 }}
+                href={processVideoUrl(item.url, item.start_time)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex flex-col bg-zinc-800/30 rounded-xl border border-zinc-700/50 overflow-hidden hover:border-zinc-600 transition-all duration-300 relative backdrop-blur"
+              >
+                <div className="relative overflow-hidden">
+                  <motion.img
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ duration: 0.3 }}
+                    src={item.metadata?.thumbnail}
+                    alt={item.metadata?.title}
+                    className="w-full h-48 object-cover"
+                  />
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    whileHover={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"
+                  />
+                  {index < 3 && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.5 + index * 0.1 }}
+                      className="absolute top-3 left-3 flex items-center gap-2"
+                    >
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
+                        className="w-2 h-2 rounded-full bg-white"
+                      />
+                      <span className="text-xs font-medium bg-white/20 border border-white/30 text-white px-2 py-1 rounded-full backdrop-blur-sm">
+                        Top Match
+                      </span>
+                    </motion.div>
+                  )}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="absolute bottom-3 right-3 bg-black/90 text-xs px-2 py-1 rounded backdrop-blur-sm"
+                  >
+                    {Math.round(item.score * 100)}% match
+                  </motion.div>
+                </div>
+
+                <div className="p-4 sm:p-5 flex-1 flex flex-col">
+                  <h3 className="font-medium text-lg mb-2 line-clamp-1">{item.metadata?.title}</h3>
+                  <p className="text-zinc-400 text-sm line-clamp-2 mb-4">{item.metadata?.description}</p>
+
+                  <div className="mb-2 text-xs text-blue-400 font-semibold">
+                    {item.final_dx && (
+                      <span>Final Dx: {item.final_dx.replace(/["\[\]]/g, '')}</span>
+                    )}
+                  </div>
+
+                  <div className="mt-auto">
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.4 }}
+                      className="flex flex-wrap gap-2 mb-4"
+                    >
+                      {filterMedicalTags(item.metadata?.title_extracted_entities).map((tag, tagIndex) => (
+                        <motion.span
+                          key={tagIndex}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 0.5 + tagIndex * 0.05 }}
+                          whileHover={{ scale: 1.05 }}
+                          className="px-2 py-1 bg-white/10 text-xs text-white rounded-full border border-white/20"
+                        >
+                          {tag.replace(/["\[\]]/g, '')}
+                        </motion.span>
+                      ))}
+                    </motion.div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-zinc-700/50">
+                      <div className="text-xs text-zinc-500">{item.metadata?.upload_date}</div>
+                      <div className="flex items-center gap-2">
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-2 sm:px-3 py-1 sm:py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-full text-xs text-zinc-300 flex items-center gap-1 transition-colors"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            handleTranscriptClick(item)
+                          }}
+                        >
+                          <FileText className="w-3 h-3" />
+                          <span className="hidden sm:inline">Transcript</span>
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-2 sm:px-3 py-1 sm:py-1.5 bg-white hover:bg-zinc-200 text-black rounded-full text-xs flex items-center gap-1 transition-colors"
+                        >
+                          <Send className="w-3 h-3" />
+                          <span className="hidden sm:inline">Watch</span>
+                        </motion.button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.a>
+            ))
+          ) : results.length > 0 ? (
+            // This section renders the actual search results
+            results.map((item, index) => (
               <motion.a
                 key={item.id || index}
                 initial={{ opacity: 0, y: 50, scale: 0.9 }}
@@ -1084,4 +1231,5 @@ export default function Home() {
     </motion.div>
   );
 }
+
 
