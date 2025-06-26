@@ -33,14 +33,82 @@ export default function Home() {
   const [selectedTranscript, setSelectedTranscript] = useState(null)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [showFilter, setShowFilter] = useState(false)
+  
+  // Filter states for all three categories
   const [selectedDiagnoses, setSelectedDiagnoses] = useState([])
+  const [selectedComplaints, setSelectedComplaints] = useState([])
+  const [selectedTopics, setSelectedTopics] = useState([])
+  
+  // Input states for filtering
   const [diagnosisInput, setDiagnosisInput] = useState("")
+  const [complaintInput, setComplaintInput] = useState("")
+  const [topicInput, setTopicInput] = useState("")
+  
+  // Tab state for filter modal
+  const [activeFilterTab, setActiveFilterTab] = useState("diagnosis") // "diagnosis", "complaint", "topics"
+  
   const [dxResults, setDxResults] = useState([])
 
-  // Filter results by selected diagnoses if set
-  const filteredResults = selectedDiagnoses.length > 0
-    ? allResults.filter(item => selectedDiagnoses.some((dx) => (item.final_dx || "").toLowerCase().includes(dx.toLowerCase())))
-    : results
+  // Extract unique chief complaints and topics from dx data
+  const [allComplaints, setAllComplaints] = useState([])
+  const [allTopics, setAllTopics] = useState([])
+
+  // Initialize complaints and topics lists
+  useEffect(() => {
+    const complaints = new Set()
+    const topics = new Set()
+    
+    Object.values(dxDataRaw || {}).forEach(item => {
+      if (item["Chief Complaint"]) {
+        // Clean up the chief complaint text
+        const cleanComplaint = item["Chief Complaint"]
+          .replace(/["\[\]]/g, '') // Remove quotes and brackets
+          .trim()
+        if (cleanComplaint) {
+          complaints.add(cleanComplaint)
+        }
+      }
+      if (item["Topics"] && typeof item["Topics"] === "string") {
+        // Parse topics string and split by common separators, then clean up
+        const topicArray = item["Topics"]
+          .split(/[,;|]/)
+          .map(t => t.replace(/["\[\]]/g, '').trim()) // Remove quotes and brackets
+          .filter(t => t.length > 0)
+        topicArray.forEach(topic => topics.add(topic))
+      }
+    })
+    
+    setAllComplaints(Array.from(complaints).sort())
+    setAllTopics(Array.from(topics).sort())
+  }, [])
+
+  // Filter results by selected criteria
+  const filteredResults = () => {
+    let filtered = allResults
+
+    // Apply dx.json filtering if any filters are selected
+    if (selectedDiagnoses.length > 0 || selectedComplaints.length > 0 || selectedTopics.length > 0) {
+      const dxFiltered = Object.entries(dxDataRaw || {}).filter(([url, meta]) => {
+        const matchesDx = selectedDiagnoses.length === 0 || 
+          selectedDiagnoses.some(dx => (meta["Final Dx"] || "").toLowerCase().includes(dx.toLowerCase()))
+        
+        const matchesComplaint = selectedComplaints.length === 0 || 
+          selectedComplaints.some(complaint => (meta["Chief Complaint"] || "").toLowerCase().includes(complaint.toLowerCase()))
+        
+        const matchesTopics = selectedTopics.length === 0 || 
+          selectedTopics.some(topic => {
+            const topics = meta["Topics"] || ""
+            return topics.toLowerCase().includes(topic.toLowerCase())
+          })
+        
+        return matchesDx && matchesComplaint && matchesTopics
+      }).map(([url, meta]) => ({ url: url.trim(), ...meta }))
+      
+      return dxFiltered
+    }
+
+    return results
+  }
 
   const handleSend = async () => {
     setLoading(true)
@@ -161,19 +229,15 @@ export default function Home() {
     fetchAllVideos()
   }, [])
 
-  // Fetch dx.json and filter by Final Dx
+  // Fetch dx.json and filter by selected criteria
   useEffect(() => {
-    if (selectedDiagnoses.length > 0) {
-      // If dx.json is not loaded, load and filter
-      const dxData = dxDataRaw || {};
-      const filtered = Object.entries(dxData).filter(([url, meta]) =>
-        selectedDiagnoses.some(dx => (meta["Final Dx"] || "").toLowerCase().includes(dx.toLowerCase()))
-      ).map(([url, meta]) => ({ url: url.trim(), ...meta }))
+    if (selectedDiagnoses.length > 0 || selectedComplaints.length > 0 || selectedTopics.length > 0) {
+      const filtered = filteredResults()
       setDxResults(filtered)
     } else {
       setDxResults([])
     }
-  }, [selectedDiagnoses])
+  }, [selectedDiagnoses, selectedComplaints, selectedTopics, allResults])
 
   // Mock API Response Handler - will process your provided data
   useEffect(() => {
@@ -505,7 +569,7 @@ export default function Home() {
                   <p className="text-zinc-400 text-sm line-clamp-2 mb-4">{item.description}</p>
                   <div className="mb-2 text-xs text-blue-400 font-semibold">
                     {item["Final Dx"] && (
-                      <span>Final Dx: {item["Final Dx"]}</span>
+                      <span>Final Dx: {item["Final Dx"].replace(/["\[\]]/g, '')}</span>
                     )}
                   </div>
                   <div className="flex items-center justify-between pt-4 border-t border-zinc-700/50">
@@ -595,7 +659,7 @@ export default function Home() {
 
                   <div className="mb-2 text-xs text-blue-400 font-semibold">
                     {item.final_dx && (
-                      <span>Final Dx: {item.final_dx}</span>
+                      <span>Final Dx: {item.final_dx.replace(/["\[\]]/g, '')}</span>
                     )}
                   </div>
 
@@ -615,7 +679,7 @@ export default function Home() {
                           whileHover={{ scale: 1.05 }}
                           className="px-2 py-1 bg-white/10 text-xs text-white rounded-full border border-white/20"
                         >
-                          {tag}
+                          {tag.replace(/["\[\]]/g, '')}
                         </motion.span>
                       ))}
                     </motion.div>
@@ -702,7 +766,7 @@ export default function Home() {
                           transition={{ delay: 0.4 + index * 0.05 }}
                           className="px-2 py-1 bg-white/10 rounded-full text-xs text-white border border-white/20"
                         >
-                          {tag}
+                          {tag.replace(/["\[\]]/g, '')}
                         </motion.span>
                       ))}
                     </div>
@@ -758,9 +822,9 @@ export default function Home() {
             aria-label="Filter"
           >
             <Filter className="w-4 h-4" />
-            {selectedDiagnoses.length > 0 && (
+            {(selectedDiagnoses.length > 0 || selectedComplaints.length > 0 || selectedTopics.length > 0) && (
               <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs font-bold rounded-full px-1.5 py-0.5 border border-zinc-800 shadow">
-                {selectedDiagnoses.length}
+                {selectedDiagnoses.length + selectedComplaints.length + selectedTopics.length}
               </span>
             )}
           </motion.button>
@@ -783,10 +847,10 @@ export default function Home() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 40 }}
               transition={{ duration: 0.25 }}
-              className="fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 bg-zinc-900 border border-zinc-700/50 rounded-2xl p-4 sm:p-5 w-[90%] sm:w-full max-w-md shadow-2xl flex flex-col gap-3"
+              className="fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 bg-zinc-900 border border-zinc-700/50 rounded-2xl p-4 sm:p-5 w-[90%] sm:w-full max-w-lg shadow-2xl flex flex-col gap-3"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-white text-base">Diagnosis Filter</span>
+                <span className="font-semibold text-white text-base">Filter Results</span>
                 <button
                   className="p-1 rounded-full hover:bg-zinc-800 text-zinc-400"
                   onClick={() => setShowFilter(false)}
@@ -795,9 +859,48 @@ export default function Home() {
                   <X className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* Tab Navigation */}
+                          <div className="flex bg-zinc-800 rounded-lg p-1 mb-3">
+                {[
+                  { id: "diagnosis", label: "Diagnosis", count: selectedDiagnoses.length },
+                  { id: "complaint", label: "Chief Complaint", count: selectedComplaints.length },
+                  { id: "topics", label: "Topics", count: selectedTopics.length }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveFilterTab(tab.id)}
+                    className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all relative ${
+                      activeFilterTab === tab.id 
+                        ? "bg-blue-600 text-white shadow-sm" 
+                        : "text-zinc-400 hover:text-white hover:bg-zinc-700"
+                    }`}
+                  >
+                    {tab.label}
+                    {tab.count > 0 && (
+                      <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
+                        activeFilterTab === tab.id ? "bg-blue-800" : "bg-zinc-600"
+                      }`}>
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Selected items display */}
               <div className="flex flex-wrap gap-1 mb-2 min-h-[28px]">
-                {selectedDiagnoses.length === 0 && <span className="text-xs text-zinc-500">No diagnoses selected</span>}
-                {selectedDiagnoses.map(dx => (
+                {activeFilterTab === "diagnosis" && selectedDiagnoses.length === 0 && (
+                  <span className="text-xs text-zinc-500">No diagnoses selected</span>
+                )}
+                {activeFilterTab === "complaint" && selectedComplaints.length === 0 && (
+                  <span className="text-xs text-zinc-500">No chief complaints selected</span>
+                )}
+                {activeFilterTab === "topics" && selectedTopics.length === 0 && (
+                  <span className="text-xs text-zinc-500">No topics selected</span>
+                )}
+                
+                {activeFilterTab === "diagnosis" && selectedDiagnoses.map(dx => (
                   <span key={dx} className="flex items-center bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs">
                     {dx}
                     <button
@@ -809,44 +912,142 @@ export default function Home() {
                     </button>
                   </span>
                 ))}
+                
+                {activeFilterTab === "complaint" && selectedComplaints.map(complaint => (
+                  <span key={complaint} className="flex items-center bg-green-600 text-white px-2 py-0.5 rounded-full text-xs">
+                    {complaint}
+                    <button
+                      className="ml-1 text-white/80 hover:text-white"
+                      onClick={() => setSelectedComplaints(selectedComplaints.filter(c => c !== complaint))}
+                      aria-label={`Remove ${complaint}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+                
+                {activeFilterTab === "topics" && selectedTopics.map(topic => (
+                  <span key={topic} className="flex items-center bg-purple-600 text-white px-2 py-0.5 rounded-full text-xs">
+                    {topic}
+                    <button
+                      className="ml-1 text-white/80 hover:text-white"
+                      onClick={() => setSelectedTopics(selectedTopics.filter(t => t !== topic))}
+                      aria-label={`Remove ${topic}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
               </div>
+
+              {/* Search input */}
               <div className="flex items-center gap-2 mb-1">
                 <input
                   type="text"
-                  value={diagnosisInput}
-                  onChange={e => setDiagnosisInput(e.target.value)}
-                  placeholder="Type to filter..."
-                  className="bg-zinc-800 text-white px-2 py-1 rounded-full outline-none text-xs w-40 border border-zinc-700 focus:border-blue-500 transition"
+                  value={
+                    activeFilterTab === "diagnosis" ? diagnosisInput :
+                    activeFilterTab === "complaint" ? complaintInput :
+                    topicInput
+                  }
+                  onChange={e => {
+                    if (activeFilterTab === "diagnosis") setDiagnosisInput(e.target.value)
+                    else if (activeFilterTab === "complaint") setComplaintInput(e.target.value)
+                    else setTopicInput(e.target.value)
+                  }}
+                  placeholder={`Search ${activeFilterTab === "diagnosis" ? "diagnoses" : activeFilterTab === "complaint" ? "chief complaints" : "topics"}...`}
+                  className="bg-zinc-800 text-white px-2 py-1 rounded-full outline-none text-xs flex-1 border border-zinc-700 focus:border-blue-500 transition"
                   autoFocus
                 />
                 <button
                   className="px-2 py-1 rounded-full bg-zinc-700 text-white text-xs hover:bg-zinc-600 border border-zinc-600"
                   onClick={() => {
-                    setSelectedDiagnoses([])
-                    setDiagnosisInput("")
+                    if (activeFilterTab === "diagnosis") {
+                      setSelectedDiagnoses([])
+                      setDiagnosisInput("")
+                    } else if (activeFilterTab === "complaint") {
+                      setSelectedComplaints([])
+                      setComplaintInput("")
+                    } else {
+                      setSelectedTopics([])
+                      setTopicInput("")
+                    }
                   }}
                 >Clear</button>
               </div>
+
+              {/* Options list */}
               <div className="flex flex-col gap-1 overflow-y-auto max-h-40 mt-1 pb-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900 bg-zinc-800 rounded-lg p-2 border border-zinc-700"
                 style={{ WebkitOverflowScrolling: 'touch' }}>
-                {diagnosisList.filter(dx => dx.toLowerCase().includes(diagnosisInput.toLowerCase()) && !selectedDiagnoses.includes(dx)).length === 0 ? (
-                  <span className="text-xs text-zinc-500">No matches</span>
-                ) : diagnosisList.filter(dx => dx.toLowerCase().includes(diagnosisInput.toLowerCase()) && !selectedDiagnoses.includes(dx)).map(dx => (
-                  <button
-                    key={dx}
-                    className="px-2 py-1 rounded-full border text-xs whitespace-nowrap bg-zinc-900 border-zinc-700 text-zinc-200 hover:bg-blue-600 hover:text-white text-left transition"
-                    onClick={() => setSelectedDiagnoses([...selectedDiagnoses, dx])}
-                  >
-                    {dx}
-                  </button>
-                ))}
+                {(() => {
+                  let options = []
+                  let selected = []
+                  let input = ""
+                  
+                  if (activeFilterTab === "diagnosis") {
+                    options = diagnosisList
+                    selected = selectedDiagnoses
+                    input = diagnosisInput
+                  } else if (activeFilterTab === "complaint") {
+                    options = allComplaints
+                    selected = selectedComplaints
+                    input = complaintInput
+                  } else {
+                    options = allTopics
+                    selected = selectedTopics
+                    input = topicInput
+                  }
+                  
+                  const filtered = options.filter(option => 
+                    option.toLowerCase().includes(input.toLowerCase()) && 
+                    !selected.includes(option)
+                  )
+                  
+                  if (filtered.length === 0) {
+                    return <span className="text-xs text-zinc-500">No matches</span>
+                  }
+                  
+                  return filtered.map(option => (
+                    <button
+                      key={option}
+                      className="px-2 py-1 rounded-full border text-xs whitespace-nowrap bg-zinc-900 border-zinc-700 text-zinc-200 hover:bg-blue-600 hover:text-white text-left transition"
+                      onClick={() => {
+                        if (activeFilterTab === "diagnosis") {
+                          setSelectedDiagnoses([...selectedDiagnoses, option])
+                        } else if (activeFilterTab === "complaint") {
+                          setSelectedComplaints([...selectedComplaints, option])
+                        } else {
+                          setSelectedTopics([...selectedTopics, option])
+                        }
+                      }}
+                    >
+                      {option}
+                    </button>
+                  ))
+                })()}
               </div>
-              <button
-                className="mt-3 px-4 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold self-end shadow"
-                onClick={() => setShowFilter(false)}
-              >
-                Filter by Dx
-              </button>
+
+              {/* Action buttons */}
+              <div className="flex gap-2 mt-3">
+                <button
+                  className="flex-1 px-4 py-1.5 rounded-full bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-medium"
+                  onClick={() => {
+                    setSelectedDiagnoses([])
+                    setSelectedComplaints([])
+                    setSelectedTopics([])
+                    setDiagnosisInput("")
+                    setComplaintInput("")
+                    setTopicInput("")
+                  }}
+                >
+                  Clear All
+                </button>
+                <button
+                  className="flex-1 px-4 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow"
+                  onClick={() => setShowFilter(false)}
+                >
+                  Apply Filters
+                </button>
+              </div>
             </motion.div>
           </>
         )}
