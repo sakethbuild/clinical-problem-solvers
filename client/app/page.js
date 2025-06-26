@@ -271,7 +271,7 @@ export default function Home() {
       <div className="absolute inset-0 bg-grid-pattern opacity-10 pointer-events-none"></div>
       
       <AnimatePresence>
-        {!results.length && !loading && (
+        {!results.length && !loading && !dxResults.length && (
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -567,11 +567,41 @@ export default function Home() {
                 <div className="p-4 sm:p-5 flex-1 flex flex-col">
                   <h3 className="font-medium text-lg mb-2 line-clamp-1">{item.title}</h3>
                   <p className="text-zinc-400 text-sm line-clamp-2 mb-4">{item.description}</p>
-                  <div className="mb-2 text-xs text-blue-400 font-semibold">
-                    {item["Final Dx"] && (
-                      <span>Final Dx: {item["Final Dx"].replace(/["\[\]]/g, '')}</span>
+                  
+                  {/* Additional details section */}
+                  <div className="space-y-2 mb-4">
+                    <div className="mb-2 text-xs text-blue-400 font-semibold">
+                      {item["Final Dx"] && (
+                        <span>Final Dx: {item["Final Dx"].replace(/["\[\]]/g, '')}</span>
+                      )}
+                    </div>
+                    
+                    {item["Chief Complaint"] && (
+                      <div className="text-xs text-green-400 font-medium">
+                        <span>Chief Complaint: {item["Chief Complaint"].replace(/["\[\]]/g, '')}</span>
+                      </div>
+                    )}
+                    
+                    {item["Topics"] && (
+                      <div className="text-xs text-purple-400 font-medium">
+                        <span>Topics: {item["Topics"].replace(/["\[\]]/g, '').split(/[,;|]/).slice(0, 3).map(t => t.trim()).join(', ')}</span>
+                        {item["Topics"].split(/[,;|]/).length > 3 && <span className="text-zinc-500"> +{item["Topics"].split(/[,;|]/).length - 3} more</span>}
+                      </div>
+                    )}
+                    
+                    {item["Patient Age"] && (
+                      <div className="text-xs text-yellow-400 font-medium">
+                        <span>Age: {item["Patient Age"].replace(/["\[\]]/g, '')}</span>
+                      </div>
+                    )}
+                    
+                    {item["Patient Sex"] && (
+                      <div className="text-xs text-pink-400 font-medium">
+                        <span>Sex: {item["Patient Sex"].replace(/["\[\]]/g, '')}</span>
+                      </div>
                     )}
                   </div>
+                  
                   <div className="flex items-center justify-between pt-4 border-t border-zinc-700/50">
                     <div className="text-xs text-zinc-500">{item.upload_date}</div>
                     <div className="flex items-center gap-2">
