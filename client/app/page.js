@@ -584,8 +584,7 @@ export default function Home() {
                     
                     {item["Topics"] && (
                       <div className="text-xs text-purple-400 font-medium">
-                        <span>Topics: {item["Topics"].replace(/["\[\]]/g, '').split(/[,;|]/).slice(0, 3).map(t => t.trim()).join(', ')}</span>
-                        {item["Topics"].split(/[,;|]/).length > 3 && <span className="text-zinc-500"> +{item["Topics"].split(/[,;|]/).length - 3} more</span>}
+                        <span>Topics: {item["Topics"].replace(/["\[\]]/g, '').split(/[,;|]/).map(t => t.trim()).filter(t => t.length > 0).join(', ')}</span>
                       </div>
                     )}
                     
@@ -1085,3 +1084,4 @@ export default function Home() {
     </motion.div>
   );
 }
+
