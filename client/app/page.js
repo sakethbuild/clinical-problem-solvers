@@ -275,6 +275,32 @@ export default function Home() {
     // handleMockApiResponse(mockData);
   }, []);
 
+  // Add helper function to match URLs and get dx.json data
+  const getDxDataForUrl = (url) => {
+    if (!url || !dxDataRaw) return null
+    
+    // Clean the URL for comparison
+    const cleanUrl = url.replace(/\n/g, "").trim()
+    
+    // Try to find exact match first
+    if (dxDataRaw[cleanUrl]) {
+      return dxDataRaw[cleanUrl]
+    }
+    
+    // Try to find partial match (YouTube video ID)
+    const videoIdMatch = cleanUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
+    if (videoIdMatch) {
+      const videoId = videoIdMatch[1]
+      for (const [dxUrl, dxData] of Object.entries(dxDataRaw)) {
+        if (dxUrl.includes(videoId)) {
+          return dxData
+        }
+      }
+    }
+    
+    return null
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -708,11 +734,50 @@ export default function Home() {
                   <h3 className="font-medium text-lg mb-2 line-clamp-1">{item.metadata?.title}</h3>
                   <p className="text-zinc-400 text-sm line-clamp-2 mb-4">{item.metadata?.description}</p>
 
-                  <div className="mb-2 text-xs text-blue-400 font-semibold">
-                    {item.final_dx && (
+                  {/* Enhanced dx.json data display */}
+                  {(() => {
+                    const dxData = getDxDataForUrl(item.url)
+                    return dxData && (
+                      <div className="space-y-2 mb-4">
+                        {dxData["Final Dx"] && (
+                          <div className="text-xs text-blue-400 font-semibold">
+                            <span>Final Dx: {dxData["Final Dx"].replace(/["\[\]]/g, '')}</span>
+                          </div>
+                        )}
+                        
+                        {dxData["Chief Complaint"] && (
+                          <div className="text-xs text-green-400 font-medium">
+                            <span>Chief Complaint: {dxData["Chief Complaint"].replace(/["\[\]]/g, '')}</span>
+                          </div>
+                        )}
+                        
+                        {dxData["Topics"] && (
+                          <div className="text-xs text-purple-400 font-medium">
+                            <span>Topics: {dxData["Topics"].replace(/["\[\]]/g, '').split(/[,;|]/).map(t => t.trim()).filter(t => t.length > 0).join(', ')}</span>
+                          </div>
+                        )}
+                        
+                        {dxData["Patient Age"] && (
+                          <div className="text-xs text-yellow-400 font-medium">
+                            <span>Age: {dxData["Patient Age"].replace(/["\[\]]/g, '')}</span>
+                          </div>
+                        )}
+                        
+                        {dxData["Patient Sex"] && (
+                          <div className="text-xs text-pink-400 font-medium">
+                            <span>Sex: {dxData["Patient Sex"].replace(/["\[\]]/g, '')}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Show original final_dx if available and no dx.json match */}
+                  {!getDxDataForUrl(item.url) && item.final_dx && (
+                    <div className="mb-2 text-xs text-blue-400 font-semibold">
                       <span>Final Dx: {item.final_dx.replace(/["\[\]]/g, '')}</span>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   <div className="mt-auto">
                     <motion.div
@@ -833,11 +898,50 @@ export default function Home() {
                   <h3 className="font-medium text-lg mb-2 line-clamp-1">{item.metadata?.title}</h3>
                   <p className="text-zinc-400 text-sm line-clamp-2 mb-4">{item.metadata?.description}</p>
 
-                  <div className="mb-2 text-xs text-blue-400 font-semibold">
-                    {item.final_dx && (
+                  {/* Enhanced dx.json data display */}
+                  {(() => {
+                    const dxData = getDxDataForUrl(item.url)
+                    return dxData && (
+                      <div className="space-y-2 mb-4">
+                        {dxData["Final Dx"] && (
+                          <div className="text-xs text-blue-400 font-semibold">
+                            <span>Final Dx: {dxData["Final Dx"].replace(/["\[\]]/g, '')}</span>
+                          </div>
+                        )}
+                        
+                        {dxData["Chief Complaint"] && (
+                          <div className="text-xs text-green-400 font-medium">
+                            <span>Chief Complaint: {dxData["Chief Complaint"].replace(/["\[\]]/g, '')}</span>
+                          </div>
+                        )}
+                        
+                        {dxData["Topics"] && (
+                          <div className="text-xs text-purple-400 font-medium">
+                            <span>Topics: {dxData["Topics"].replace(/["\[\]]/g, '').split(/[,;|]/).map(t => t.trim()).filter(t => t.length > 0).join(', ')}</span>
+                          </div>
+                        )}
+                        
+                        {dxData["Patient Age"] && (
+                          <div className="text-xs text-yellow-400 font-medium">
+                            <span>Age: {dxData["Patient Age"].replace(/["\[\]]/g, '')}</span>
+                          </div>
+                        )}
+                        
+                        {dxData["Patient Sex"] && (
+                          <div className="text-xs text-pink-400 font-medium">
+                            <span>Sex: {dxData["Patient Sex"].replace(/["\[\]]/g, '')}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Show original final_dx if available and no dx.json match */}
+                  {!getDxDataForUrl(item.url) && item.final_dx && (
+                    <div className="mb-2 text-xs text-blue-400 font-semibold">
                       <span>Final Dx: {item.final_dx.replace(/["\[\]]/g, '')}</span>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   <div className="mt-auto">
                     <motion.div
